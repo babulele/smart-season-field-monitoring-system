@@ -1,0 +1,48 @@
+# Environment variables (highest priority)
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+dist/
+build/
+.next/
+
+# IDE and Editor
+.vscode/
+.idea/
+*.suo
+*.sln
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS files
+Thumbs.db
+Desktop.ini
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Temporary/Cache
+.cache/
+.eslintcache
+.turbo/
+dist-ssr/
+
+# Database backups
+*.sql
+*.db
+*.sqlite
