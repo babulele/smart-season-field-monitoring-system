@@ -534,6 +534,37 @@ button {
   color: #35546a;
 }
 
+.role-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.role-badge.admin-badge {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.role-badge.agent-badge {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.header-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-title-row h3 {
+  margin: 0;
+}
+
 .assign-inline {
   display: flex;
   gap: 6px;

@@ -578,6 +578,7 @@ function Dashboard({ user, token }) {
               <p>SmartSeason</p>
               <small>FIELD MONITOR</small>
             </div>
+            <span className="role-badge admin-badge">⌂ ADMIN</span>
           </div>
           <div className="side-section">
             <p className="side-title">Overview</p>
@@ -629,7 +630,10 @@ function Dashboard({ user, token }) {
         <main className="admin-main">
           <header className="admin-header">
             <div>
-              <h3>Season overview</h3>
+              <div className="header-title-row">
+                <h3>Season overview</h3>
+                <span className="role-badge admin-badge">ADMIN ACCOUNT</span>
+              </div>
               <p>April 2026 - field activities across 6 agents</p>
             </div>
             <div className="admin-actions">
@@ -823,6 +827,7 @@ function Dashboard({ user, token }) {
             <p>SmartSeason</p>
             <small>FIELD MONITOR</small>
           </div>
+          <span className="role-badge agent-badge">◌ AGENT</span>
         </div>
         <div className="side-section">
           <p className="side-title">My work</p>
@@ -859,7 +864,10 @@ function Dashboard({ user, token }) {
       <main className="admin-main">
         <header className="admin-header">
           <div>
-            <h3>My Fields</h3>
+            <div className="header-title-row">
+              <h3>My Fields</h3>
+              <span className="role-badge agent-badge">AGENT ACCOUNT</span>
+            </div>
             <p>{summary.totalFields} fields assigned • Season April 2026</p>
           </div>
         </header>
