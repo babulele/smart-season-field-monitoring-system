@@ -346,4 +346,33 @@ start().catch((error) => {
   // eslint-disable-next-line no-console
   console.error(error);
   process.exit(1);
-});
+});const corsOptions = {
+  origin(origin, callback) {
+    // 1. Allow requests with no origin (like mobile apps, curl, or Postman)
+    if (!origin) return callback(null, true);
+
+    // 2. Allow localhost for development
+    const isLocalhost =
+      /^http:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin) ||
+      /^http:\/\/\[::1\]:\d+$/i.test(origin);
+
+    // 3. Allow environment variable FRONTEND_URL
+    const isEnvAllowed = process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL;
+
+    // 4. Allow ANY Vercel deployment for this project (including previews)
+    // This regex matches your project name pattern on vercel.app
+    const isVercelAllowed = /\.vercel\.app$/i.test(origin);
+
+    if (isLocalhost || isEnvAllowed || isVercelAllowed) {
+      // Use 'true' to tell CORS this origin is allowed
+      return callback(null, true);
+    }
+
+    // If it doesn't match anything, block it
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
+};
