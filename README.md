@@ -1,6 +1,7 @@
 # SmartSeason Field Monitoring System
 
 A simple full-stack web app to track crop progress across fields during a season with two roles: `ADMIN` and `AGENT`.
+live deployment link: https://smart-season-field-monitoring-system-cm5qptw42.vercel.app
 
 ## Stack
 
