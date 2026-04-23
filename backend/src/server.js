@@ -12,11 +12,22 @@ const app = express();
 const corsOptions = {
   origin(origin, callback) {
     if (!origin) return callback(null, true);
-    const allowed =
+    
+    // Allow localhost for development
+    const localhostAllowed =
       /^http:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin) ||
       /^http:\/\/\[::1\]:\d+$/i.test(origin);
-    if (!allowed) return callback(null, false);
-    return callback(null, origin);
+    
+    // Allow production frontend URLs
+    const productionAllowed =
+      origin === process.env.FRONTEND_URL ||
+      origin === "https://smart-season-field-monitoring-syste-lac.vercel.app";
+    
+    if (localhostAllowed || productionAllowed) {
+      return callback(null, origin);
+    }
+    
+    return callback(null, false);
   },
   credentials: true,
   methods: ["GET", "POST", "PATCH", "OPTIONS"],
