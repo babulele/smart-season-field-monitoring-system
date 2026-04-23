@@ -9,37 +9,40 @@ const { initializeSchema, seedUsers, signToken } = require("./auth");
 const { requireAuth, requireRole, canAccessField } = require("./middleware");
 
 const app = express();
+
+// --- CORRECTED CORS CONFIGURATION ---
 const corsOptions = {
   origin(origin, callback) {
     if (!origin) return callback(null, true);
     
-    // Allow localhost for development
-    const localhostAllowed =
+    const isLocalhost =
       /^http:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin) ||
       /^http:\/\/\[::1\]:\d+$/i.test(origin);
     
-    // Allow environment variable FRONTEND_URL (for production)
-    const envAllowed = process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL;
+    const isEnvAllowed = process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL;
     
-    // Allow any Vercel deployment (*.vercel.app)
-    const vercelAllowed = /^https:\/\/.*\.vercel\.app$/i.test(origin);
+    // Updated regex to be more inclusive of Vercel preview URLs
+    const isVercelAllowed = /\.vercel\.app$/i.test(origin);
     
-    if (localhostAllowed || envAllowed || vercelAllowed) {
-      return callback(null, origin);
+    if (isLocalhost || isEnvAllowed || isVercelAllowed) {
+      return callback(null, true); // Changed from 'origin' to 'true'
     }
     
-    return callback(null, false);
+    return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
-  methods: ["GET", "POST", "PATCH", "OPTIONS"],
+  methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 200
 };
+
 app.use(cors(corsOptions));
-app.options(/.*/, cors(corsOptions));
+// Remove app.options(/.*/) as the middleware above handles preflight properly
 app.use(express.json());
 
 const stageEnum = z.enum(["PLANTED", "GROWING", "READY", "HARVESTED"]);
 
+// --- DATABASE HELPER ---
 async function fetchFieldsForUser(user) {
   const params = [];
   let whereClause = "";
@@ -89,6 +92,7 @@ async function fetchFieldsForUser(user) {
   }));
 }
 
+// --- ROUTES ---
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 app.post("/auth/login", async (req, res) => {
@@ -157,14 +161,10 @@ app.post("/fields", requireAuth, requireRole("ADMIN"), async (req, res) => {
 
 app.patch("/fields/:id", requireAuth, async (req, res) => {
   const fieldId = Number(req.params.id);
-  if (!fieldId) {
-    return res.status(400).json({ error: "Invalid field id" });
-  }
+  if (!fieldId) return res.status(400).json({ error: "Invalid field id" });
 
   const canAccess = await canAccessField(req.user, fieldId);
-  if (!canAccess) {
-    return res.status(403).json({ error: "Forbidden" });
-  }
+  if (!canAccess) return res.status(403).json({ error: "Forbidden" });
 
   const schema = z.object({
     name: z.string().optional(),
@@ -173,51 +173,30 @@ app.patch("/fields/:id", requireAuth, async (req, res) => {
     currentStage: stageEnum.optional(),
   });
   const parsed = schema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.issues[0].message });
-  }
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
 
   if (req.user.role !== "ADMIN") {
     const agentAllowed = z.object({ currentStage: stageEnum });
     const result = agentAllowed.safeParse(parsed.data);
-    if (!result.success) {
-      return res.status(403).json({ error: "Agents can only update stage" });
-    }
+    if (!result.success) return res.status(403).json({ error: "Agents can only update stage" });
   }
 
   const updates = [];
   const values = [];
-  if (parsed.data.name !== undefined) {
-    updates.push("name = ?");
-    values.push(parsed.data.name);
-  }
-  if (parsed.data.cropType !== undefined) {
-    updates.push("crop_type = ?");
-    values.push(parsed.data.cropType);
-  }
-  if (parsed.data.plantingDate !== undefined) {
-    updates.push("planting_date = ?");
-    values.push(parsed.data.plantingDate);
-  }
-  if (parsed.data.currentStage !== undefined) {
-    updates.push("current_stage = ?");
-    values.push(parsed.data.currentStage);
-  }
-  if (!updates.length) {
-    return res.status(400).json({ error: "No valid fields to update" });
-  }
+  if (parsed.data.name !== undefined) { updates.push("name = ?"); values.push(parsed.data.name); }
+  if (parsed.data.cropType !== undefined) { updates.push("crop_type = ?"); values.push(parsed.data.cropType); }
+  if (parsed.data.plantingDate !== undefined) { updates.push("planting_date = ?"); values.push(parsed.data.plantingDate); }
+  if (parsed.data.currentStage !== undefined) { updates.push("current_stage = ?"); values.push(parsed.data.currentStage); }
+  
+  if (!updates.length) return res.status(400).json({ error: "No valid fields to update" });
 
   updates.push("updated_at = CURRENT_TIMESTAMP");
   values.push(fieldId);
 
   const [updateResult] = await pool.query(`UPDATE fields SET ${updates.join(", ")} WHERE id = ?`, values);
-  if (!updateResult.affectedRows) {
-    return res.status(404).json({ error: "Field not found" });
-  }
-  const [updatedRows] = await pool.query(
-    "SELECT id, name, crop_type, planting_date, current_stage FROM fields WHERE id = ?",
-    [fieldId]
-  );
+  if (!updateResult.affectedRows) return res.status(404).json({ error: "Field not found" });
+  
+  const [updatedRows] = await pool.query("SELECT id, name, crop_type, planting_date, current_stage FROM fields WHERE id = ?", [fieldId]);
   return res.json(updatedRows[0]);
 });
 
@@ -225,9 +204,7 @@ app.post("/fields/:id/assign", requireAuth, requireRole("ADMIN"), async (req, re
   const fieldId = Number(req.params.id);
   const schema = z.object({ agentId: z.number().int().positive() });
   const parsed = schema.safeParse(req.body);
-  if (!fieldId || !parsed.success) {
-    return res.status(400).json({ error: "Invalid payload" });
-  }
+  if (!fieldId || !parsed.success) return res.status(400).json({ error: "Invalid payload" });
 
   await pool.query(
     `INSERT INTO field_assignments (field_id, agent_id)
@@ -240,13 +217,10 @@ app.post("/fields/:id/assign", requireAuth, requireRole("ADMIN"), async (req, re
 
 app.post("/fields/:id/updates", requireAuth, requireRole("AGENT"), async (req, res) => {
   const fieldId = Number(req.params.id);
-  if (!fieldId) {
-    return res.status(400).json({ error: "Invalid field id" });
-  }
+  if (!fieldId) return res.status(400).json({ error: "Invalid field id" });
+  
   const canAccess = await canAccessField(req.user, fieldId);
-  if (!canAccess) {
-    return res.status(403).json({ error: "You are not assigned to this field" });
-  }
+  if (!canAccess) return res.status(403).json({ error: "You are not assigned to this field" });
 
   const schema = z.object({
     stage: stageEnum,
@@ -254,9 +228,7 @@ app.post("/fields/:id/updates", requireAuth, requireRole("AGENT"), async (req, r
     observedAt: z.string().optional(),
   });
   const parsed = schema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.issues[0].message });
-  }
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
 
   await pool.query(
     `INSERT INTO field_updates (field_id, agent_id, stage, note, observed_at)
@@ -274,15 +246,12 @@ app.post("/fields/:id/updates", requireAuth, requireRole("AGENT"), async (req, r
 
 app.get("/fields/:id/updates", requireAuth, async (req, res) => {
   const fieldId = Number(req.params.id);
-  if (!fieldId) {
-    return res.status(400).json({ error: "Invalid field id" });
-  }
+  if (!fieldId) return res.status(400).json({ error: "Invalid field id" });
+  
   const canAccess = await canAccessField(req.user, fieldId);
-  if (!canAccess) {
-    return res.status(403).json({ error: "Forbidden" });
-  }
+  if (!canAccess) return res.status(403).json({ error: "Forbidden" });
 
-  const updates = await pool.query(
+  const [updates] = await pool.query(
     `SELECT fu.id, fu.stage, fu.note, fu.observed_at, u.name AS agent_name
      FROM field_updates fu
      JOIN users u ON u.id = fu.agent_id
@@ -290,7 +259,7 @@ app.get("/fields/:id/updates", requireAuth, async (req, res) => {
      ORDER BY fu.observed_at DESC`,
     [fieldId]
   );
-  return res.json(updates[0]);
+  return res.json(updates);
 });
 
 app.get("/dashboard/summary", requireAuth, async (req, res) => {
@@ -331,48 +300,18 @@ app.get("/agents", requireAuth, requireRole("ADMIN"), async (_req, res) => {
   return res.json(agents);
 });
 
+// --- SERVER START ---
 async function start() {
   await initializeSchema();
   await seedUsers();
 
   const port = process.env.PORT || 4000;
   app.listen(port, () => {
-    // eslint-disable-next-line no-console
     console.log(`API running on http://localhost:${port}`);
   });
 }
 
 start().catch((error) => {
-  // eslint-disable-next-line no-console
   console.error(error);
   process.exit(1);
-});const corsOptions = {
-  origin(origin, callback) {
-    // 1. Allow requests with no origin (like mobile apps, curl, or Postman)
-    if (!origin) return callback(null, true);
-
-    // 2. Allow localhost for development
-    const isLocalhost =
-      /^http:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin) ||
-      /^http:\/\/\[::1\]:\d+$/i.test(origin);
-
-    // 3. Allow environment variable FRONTEND_URL
-    const isEnvAllowed = process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL;
-
-    // 4. Allow ANY Vercel deployment for this project (including previews)
-    // This regex matches your project name pattern on vercel.app
-    const isVercelAllowed = /\.vercel\.app$/i.test(origin);
-
-    if (isLocalhost || isEnvAllowed || isVercelAllowed) {
-      // Use 'true' to tell CORS this origin is allowed
-      return callback(null, true);
-    }
-
-    // If it doesn't match anything, block it
-    return callback(new Error("Not allowed by CORS"));
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
-};
+});
