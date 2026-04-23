@@ -18,12 +18,13 @@ const corsOptions = {
       /^http:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin) ||
       /^http:\/\/\[::1\]:\d+$/i.test(origin);
     
-    // Allow production frontend URLs
-    const productionAllowed =
-      origin === process.env.FRONTEND_URL ||
-      origin === "https://smart-season-field-monitoring-syste-lac.vercel.app";
+    // Allow environment variable FRONTEND_URL (for production)
+    const envAllowed = process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL;
     
-    if (localhostAllowed || productionAllowed) {
+    // Allow any Vercel deployment (*.vercel.app)
+    const vercelAllowed = /^https:\/\/.*\.vercel\.app$/i.test(origin);
+    
+    if (localhostAllowed || envAllowed || vercelAllowed) {
       return callback(null, origin);
     }
     
